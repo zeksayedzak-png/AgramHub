@@ -1,6 +1,6 @@
 --[[
-    Crystal Manager Pro - V2.1 (Anti-Cheat Bypass Update)
-    تم إضافة ميزة الضغط التلقائي على زر التأكيد لتفادي العودة للمكان السابق
+    Crystal Manager Pro - V2.2 (Timing Bypass Update)
+    التعديل: إضافة تأخير 0.3 ثانية بعد الضغط على زر التأكيد لضمان نجاح البايباس
 ]]
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -27,7 +27,7 @@ Title.Parent = MainFrame
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Crystal Manager V2.1 💎"
+Title.Text = "Crystal Manager V2.2 💎"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 
@@ -43,7 +43,6 @@ UIListLayout.Parent = ScrollFrame
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 10)
 
--- جداول لحفظ الحالة
 local LastUsedIndex = {}
 
 -- دالة الـ ESP
@@ -53,8 +52,7 @@ local function ToggleESP(crystalName, state)
         if v.Name == crystalName and v:IsA("BasePart") then
             if state then
                 if not v:FindFirstChild("Highlight") then
-                    local hl = Instance.new("Highlight", v)
-                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    Instance.new("Highlight", v).FillColor = Color3.fromRGB(255, 0, 0)
                 end
             else
                 if v:FindFirstChild("Highlight") then v.Highlight:Destroy() end
@@ -67,8 +65,7 @@ end
 local function BringCrystals(crystalName)
     local char = game.Players.LocalPlayer.Character
     if char and char:FindFirstChild("HumanoidRootPart") then
-        local path = workspace.Things.Crystals
-        for _, v in pairs(path:GetChildren()) do
+        for _, v in pairs(workspace.Things.Crystals:GetChildren()) do
             if v.Name == crystalName and v:IsA("BasePart") then
                 v.CFrame = char.HumanoidRootPart.CFrame + Vector3.new(0, 7, 0)
                 v.Anchored = false
@@ -77,33 +74,29 @@ local function BringCrystals(crystalName)
     end
 end
 
--- دالة الضغط التلقائي على زر التأكيد (Bypass)
-local function BypassTeleport()
+-- دالة الضغط على الزر (Bypass)
+local function PressBypassButton()
     pcall(function()
         local player = game.Players.LocalPlayer
-        local confirmButton = player.PlayerGui.ExplorerHud.ConfirmHome.Yes
+        local btn = player.PlayerGui.ExplorerHud.ConfirmHome.Yes
         
-        -- محاكاة الضغط على الزر
-        if confirmButton:IsA("TextButton") or confirmButton:IsA("ImageButton") then
-            -- نستخدم firesignal إذا كان المحقن يدعمه، أو نضغط عليه برمجياً
+        -- محاكاة الضغط
+        if btn then
+            -- استخدام الكود المناسب للمحقنات لتفعيل الأزرار
             if firesignal then
-                firesignal(confirmButton.MouseButton1Click)
+                firesignal(btn.MouseButton1Click)
+                firesignal(btn.Activated)
             else
-                -- محاولة تفعيل الوظيفة المرتبطة بالزر يدوياً
-                confirmButton.Visible = true
-                -- نضغط عليه فيزيائياً عبر الكود
-                local events = {"MouseButton1Click", "MouseButton1Down", "Activated"}
-                for _, event in pairs(events) do
-                    for _, connection in pairs(getconnections(confirmButton[event])) do
-                        connection:Fire()
-                    end
+                -- طريقة احتياطية إذا كان المحقن لا يدعم firesignal
+                for _, connection in pairs(getconnections(btn.MouseButton1Click)) do
+                    connection:Fire()
                 end
             end
         end
     end)
 end
 
--- دالة التنقل المعدلة (Teleport to Next)
+-- دالة التنقل الذكية مع التأخير المطلوب
 local function TeleportToNext(crystalName)
     local char = game.Players.LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -119,6 +112,7 @@ local function TeleportToNext(crystalName)
     
     if #allCrystals == 0 then return end
     
+    -- اختيار الكريستالة التالية
     if not LastUsedIndex[crystalName] or LastUsedIndex[crystalName] >= #allCrystals then
         LastUsedIndex[crystalName] = 1
     else
@@ -127,17 +121,17 @@ local function TeleportToNext(crystalName)
     
     local target = allCrystals[LastUsedIndex[crystalName]]
     
-    -- تنفيذ خدعة الـ Bypass قبل النقل
-    BypassTeleport()
+    -- [الخطوة 1] الضغط على الزر أولاً
+    PressBypassButton()
     
-    -- انتظار بسيط جداً كما طلبت (0.1 ثانية)
-    task.wait(0.1)
+    -- [الخطوة 2] الانتظار 0.3 ثانية (لحل مشكلة التأخير في اللعبة)
+    task.wait(0.3)
     
-    -- تنفيذ النقل
+    -- [الخطوة 3] الانتقال للكريستالة
     char.HumanoidRootPart.CFrame = target.CFrame + Vector3.new(0, 3, 0)
 end
 
--- دالة إنشاء أزرار التحكم لكل نوع
+-- إنشاء أزرار التحكم
 local function CreateCrystalControl(name)
     local Frame = Instance.new("Frame")
     local Label = Instance.new("TextLabel")
@@ -161,9 +155,7 @@ local function CreateCrystalControl(name)
     ESPBtn.Text = "ESP"
     ESPBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
     ESPBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    ESPBtn.Font = Enum.Font.Gotham
     ESPBtn.Parent = Frame
-
     local espActive = false
     ESPBtn.MouseButton1Click:Connect(function()
         espActive = not espActive
@@ -176,7 +168,6 @@ local function CreateCrystalControl(name)
     BringBtn.Text = "Bring"
     BringBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 150)
     BringBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    BringBtn.Font = Enum.Font.Gotham
     BringBtn.Parent = Frame
     BringBtn.MouseButton1Click:Connect(function() BringCrystals(name) end)
 
@@ -192,6 +183,7 @@ local function CreateCrystalControl(name)
     ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
 end
 
+-- فحص الأنواع
 local function Scan()
     local path = workspace:WaitForChild("Things"):WaitForChild("Crystals")
     local found = {}
@@ -205,6 +197,7 @@ end
 
 Scan()
 
+-- زر الإغلاق
 local Close = Instance.new("TextButton", MainFrame)
 Close.Size = UDim2.new(0, 25, 0, 25)
 Close.Position = UDim2.new(1, -30, 0, 5)
