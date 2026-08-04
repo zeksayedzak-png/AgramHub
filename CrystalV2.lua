@@ -1,6 +1,6 @@
 --[[
-    Crystal Manager Pro - V3.5 (Smooth Travel Update)
-    Features: Smart ESP, Bring All, Smooth Teleport, Speed Control
+    Crystal Manager Pro - V4.0 (Heavy Weight/Size Update)
+    Features: Target Largest, Auto-Stay, Smooth Travel, Speed Control
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -8,16 +8,18 @@ local RunService = game:GetService("RunService")
 
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
-local SideFrame = Instance.new("Frame") -- اللوحة الجانبية
+local SideFrame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
 local ScrollFrame = Instance.new("ScrollingFrame")
 local UIListLayout = Instance.new("UIListLayout")
 
--- إعدادات السرعة الافتراضية
+-- إعدادات الحالة
 _G.TravelSpeed = 50 
+local CurrentTarget = nil -- لتخزين الكريستال الحالي
+local IsMoving = false
 
--- إعدادات الواجهة الأساسية
-ScreenGui.Name = "CrystalHunter_V3_5"
+-- إعدادات الواجهة
+ScreenGui.Name = "CrystalHunter_V4"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -29,11 +31,11 @@ MainFrame.Size = UDim2.new(0, 270, 0, 320)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
--- إنشاء اللوحة الجانبية (متلصقة من اليسار)
+-- اللوحة الجانبية لإعدادات السرعة
 SideFrame.Name = "SideFrame"
 SideFrame.Parent = MainFrame
 SideFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-SideFrame.Position = UDim2.new(0, -110, 0, 0) -- تظهر على يسار القائمة
+SideFrame.Position = UDim2.new(0, -110, 0, 0)
 SideFrame.Size = UDim2.new(0, 105, 0, 150)
 SideFrame.BorderSizePixel = 0
 
@@ -54,7 +56,6 @@ SpeedLabel.BackgroundTransparency = 1
 SpeedLabel.Font = Enum.Font.GothamBold
 SpeedLabel.TextSize = 12
 
--- أزرار التحكم بالسرعة
 local function CreateSpeedBtn(text, pos, delta)
     local btn = Instance.new("TextButton", SideFrame)
     btn.Size = UDim2.new(0, 40, 0, 40)
@@ -63,10 +64,8 @@ local function CreateSpeedBtn(text, pos, delta)
     btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 20
-    
     btn.MouseButton1Click:Connect(function()
-        _G.TravelSpeed = math.max(5, _G.TravelSpeed + delta) -- لا تقل السرعة عن 5
+        _G.TravelSpeed = math.max(10, _G.TravelSpeed + delta)
         SpeedLabel.Text = "Travel Speed:\n" .. _G.TravelSpeed
     end)
 end
@@ -74,121 +73,53 @@ end
 CreateSpeedBtn("+", UDim2.new(0, 55, 0, 85), 5)
 CreateSpeedBtn("-", UDim2.new(0, 10, 0, 85), -5)
 
--- دالة الحركة السلسة (بدل التيلبورت المباشر)
-local function SmoothMove(targetCFrame)
-    local char = game.Players.LocalPlayer.Character
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    local distance = (hrp.Position - targetCFrame.Position).Magnitude
-    local duration = distance / _G.TravelSpeed
-    
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame + Vector3.new(0, 3, 0)})
-    
-    -- تثبيت اللاعب أثناء الحركة لمنع السقوط (اختياري)
-    hrp.Anchored = true
-    tween:Play()
-    tween.Completed:Connect(function()
-        hrp.Anchored = false
-    end)
-end
+-- دالة البحث عن أكبر كريستال من النوع المحدد
+local function FindLargestCrystal(crystalName)
+    local path = workspace.Things.Crystals:GetChildren()
+    local largest = nil
+    local maxVolume = 0
 
--- (باقي أجزاء السكريبت السابقة مع تعديل الـ TP)
-
-Title.Name = "Title"
-Title.Parent = MainFrame
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "Crystal Manager V3.5 💎"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 16
-
-ScrollFrame.Name = "ScrollFrame"
-ScrollFrame.Parent = MainFrame
-ScrollFrame.BackgroundTransparency = 1
-ScrollFrame.Position = UDim2.new(0, 5, 0, 40)
-ScrollFrame.Size = UDim2.new(1, -10, 1, -45)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollFrame.ScrollBarThickness = 4
-
-UIListLayout.Parent = ScrollFrame
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 10)
-
-local LastUsedIndex = {}
-local ActiveESP = {}
-
-local function CreateTag(target, color)
-    if target:FindFirstChild("CrystalTag") then return end
-    local hl = Instance.new("Highlight", target)
-    hl.Name = "CrystalHighlight"
-    hl.FillColor = color
-    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-    hl.FillTransparency = 0.5
-
-    local bg = Instance.new("BillboardGui", target)
-    bg.Name = "CrystalTag"
-    bg.AlwaysOnTop = true
-    bg.Size = UDim2.new(0, 100, 0, 50)
-    bg.ExtentsOffset = Vector3.new(0, 3, 0)
-
-    local tl = Instance.new("TextLabel", bg)
-    tl.Size = UDim2.new(1, 0, 1, 0)
-    tl.BackgroundTransparency = 1
-    tl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tl.Font = Enum.Font.GothamBold
-    tl.TextSize = 12
-    return tl, hl
-end
-
-task.spawn(function()
-    while task.wait(0.5) do
-        local char = game.Players.LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then continue end
-        local myPos = char.HumanoidRootPart.Position
-
-        for crystalName, isActive in pairs(ActiveESP) do
-            if isActive then
-                local allOfThisType = {}
-                for _, v in pairs(workspace.Things.Crystals:GetChildren()) do
-                    if v.Name == crystalName and v:IsA("BasePart") then
-                        table.insert(allOfThisType, {part = v, dist = (v.Position - myPos).Magnitude})
-                    end
-                end
-                table.sort(allOfThisType, function(a, b) return a.dist < b.dist end)
-                for i = 1, math.min(5, #allOfThisType) do
-                    local crystal = allOfThisType[i].part
-                    local label, highlight = CreateTag(crystal, Color3.fromRGB(0, 255, 255))
-                    if label then
-                        label.Parent.Enabled = true
-                        highlight.Enabled = true
-                        label.Text = crystalName .. "\n[" .. math.floor(allOfThisType[i].dist) .. "m]"
-                    end
-                end
+    for _, v in pairs(path) do
+        if v.Name == crystalName and v:IsA("BasePart") then
+            -- حساب الحجم (الطول * العرض * الارتفاع)
+            local volume = v.Size.X * v.Size.Y * v.Size.Z
+            if volume > maxVolume then
+                maxVolume = volume
+                largest = v
             end
         end
     end
-end)
-
-local function TeleportToNext(crystalName)
-    local allCrystals = {}
-    for _, v in pairs(workspace.Things.Crystals:GetChildren()) do
-        if v.Name == crystalName and v:IsA("BasePart") then table.insert(allCrystals, v) end
-    end
-    if #allCrystals == 0 then return end
-    
-    if not LastUsedIndex[crystalName] or LastUsedIndex[crystalName] >= #allCrystals then
-        LastUsedIndex[crystalName] = 1
-    else
-        LastUsedIndex[crystalName] = LastUsedIndex[crystalName] + 1
-    end
-    
-    -- استخدام الحركة السلسة بدلاً من النقل المباشر
-    SmoothMove(allCrystals[LastUsedIndex[crystalName]].CFrame)
+    return largest
 end
 
+-- دالة الحركة السلسة
+local function SmoothMoveTo(target)
+    if not target or IsMoving then return end
+    IsMoving = true
+    
+    local char = game.Players.LocalPlayer.Character
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    
+    while target and target.Parent and target:IsDescendantOf(workspace) do
+        local dist = (hrp.Position - target.Position).Magnitude
+        if dist < 5 then 
+            hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+            break 
+        end
+        
+        -- تحريك تدريجي نحو الهدف
+        local direction = (target.Position - hrp.Position).Unit
+        hrp.Velocity = direction * _G.TravelSpeed
+        hrp.CFrame = CFrame.lookAt(hrp.Position, target.Position)
+        
+        task.wait()
+    end
+    
+    hrp.Velocity = Vector3.new(0,0,0)
+    IsMoving = false
+end
+
+-- زر التحكم في الكريستال
 local function CreateCrystalControl(name)
     local Frame = Instance.new("Frame", ScrollFrame)
     Frame.Size = UDim2.new(0.95, 0, 0, 90)
@@ -201,44 +132,53 @@ local function CreateCrystalControl(name)
     Label.BackgroundTransparency = 1
     Label.Font = Enum.Font.GothamBold
 
-    local ESPBtn = Instance.new("TextButton", Frame)
-    ESPBtn.Size = UDim2.new(0.3, 0, 0, 50)
-    ESPBtn.Position = UDim2.new(0.02, 0, 0, 30)
-    ESPBtn.Text = "Smart ESP"
-    ESPBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-    ESPBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    ESPBtn.MouseButton1Click:Connect(function()
-        ActiveESP[name] = not ActiveESP[name]
-        ESPBtn.BackgroundColor3 = ActiveESP[name] and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(100, 0, 0)
-    end)
+    -- زر البحث والذهاب للأكبر
+    local GoBtn = Instance.new("TextButton", Frame)
+    GoBtn.Size = UDim2.new(0.9, 0, 0, 45)
+    GoBtn.Position = UDim2.new(0.05, 0, 0, 35)
+    GoBtn.Text = "Go to Largest 💎"
+    GoBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    GoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    GoBtn.Font = Enum.Font.GothamBold
 
-    local BringBtn = Instance.new("TextButton", Frame)
-    BringBtn.Size = UDim2.new(0.3, 0, 0, 50)
-    BringBtn.Position = UDim2.new(0.35, 0, 0, 30)
-    BringBtn.Text = "Bring"
-    BringBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 150)
-    BringBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    BringBtn.MouseButton1Click:Connect(function()
-        local char = game.Players.LocalPlayer.Character
-        for _, v in pairs(workspace.Things.Crystals:GetChildren()) do
-            if v.Name == name and v:IsA("BasePart") then
-                v.CFrame = char.HumanoidRootPart.CFrame + Vector3.new(0, 7, 0)
-                v.Anchored = false
-            end
+    GoBtn.MouseButton1Click:Connect(function()
+        local target = FindLargestCrystal(name)
+        if target then
+            CurrentTarget = target
+            task.spawn(function()
+                SmoothMoveTo(target)
+                -- بعد الوصول، إذا اختفت، يبحث عن الكبيرة التالية تلقائياً
+                while CurrentTarget == target and (not target or not target.Parent) do
+                    task.wait(1)
+                    local nextBig = FindLargestCrystal(name)
+                    if nextBig then
+                        target = nextBig
+                        SmoothMoveTo(target)
+                    end
+                end
+            end)
         end
     end)
-
-    local TPNextBtn = Instance.new("TextButton", Frame)
-    TPNextBtn.Size = UDim2.new(0.3, 0, 0, 50)
-    TPNextBtn.Position = UDim2.new(0.68, 0, 0, 30)
-    TPNextBtn.Text = "Go Next"
-    TPNextBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
-    TPNextBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    TPNextBtn.MouseButton1Click:Connect(function() TeleportToNext(name) end)
-
-    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
 end
 
+-- واجهة العناوين والسكروول
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Crystal Manager V4.0 💎"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+
+ScrollFrame.Parent = MainFrame
+ScrollFrame.Position = UDim2.new(0, 5, 0, 40)
+ScrollFrame.Size = UDim2.new(1, -10, 1, -45)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.ScrollBarThickness = 4
+UIListLayout.Parent = ScrollFrame
+UIListLayout.Padding = UDim.new(0, 10)
+
+-- فحص الأنواع الموجودة في الماب
 local function Scan()
     local path = workspace:WaitForChild("Things"):WaitForChild("Crystals")
     local found = {}
@@ -251,10 +191,11 @@ local function Scan()
 end
 Scan()
 
+-- زر الإغلاق
 local Close = Instance.new("TextButton", MainFrame)
 Close.Size = UDim2.new(0, 25, 0, 25)
 Close.Position = UDim2.new(1, -30, 0, 5)
 Close.Text = "X"
 Close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-Close.TextColor3 = Color3.fromRGB(255,255,255)
+Close.TextColor3 = Color3.fromRGB(255, 255, 255)
 Close.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
