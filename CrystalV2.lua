@@ -1,6 +1,6 @@
 --[[
-    Crystal Manager Pro - V3.5 (Smooth Travel Update)
-    Features: Smart ESP, Bring All, Smooth Teleport, Speed Control
+    Crystal Manager Pro - V3.6 (Size Prioritization Update)
+    Features: Smart ESP, Bring All, Smooth Teleport, Speed Control, Giant Crystal Priority
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -8,16 +8,14 @@ local RunService = game:GetService("RunService")
 
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
-local SideFrame = Instance.new("Frame") -- اللوحة الجانبية
+local SideFrame = Instance.new("Frame") 
 local Title = Instance.new("TextLabel")
 local ScrollFrame = Instance.new("ScrollingFrame")
 local UIListLayout = Instance.new("UIListLayout")
 
--- إعدادات السرعة الافتراضية
 _G.TravelSpeed = 50 
 
--- إعدادات الواجهة الأساسية
-ScreenGui.Name = "CrystalHunter_V3_5"
+ScreenGui.Name = "CrystalHunter_V3_6"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -29,11 +27,10 @@ MainFrame.Size = UDim2.new(0, 270, 0, 320)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
--- إنشاء اللوحة الجانبية (متلصقة من اليسار)
 SideFrame.Name = "SideFrame"
 SideFrame.Parent = MainFrame
 SideFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-SideFrame.Position = UDim2.new(0, -110, 0, 0) -- تظهر على يسار القائمة
+SideFrame.Position = UDim2.new(0, -110, 0, 0)
 SideFrame.Size = UDim2.new(0, 105, 0, 150)
 SideFrame.BorderSizePixel = 0
 
@@ -54,7 +51,6 @@ SpeedLabel.BackgroundTransparency = 1
 SpeedLabel.Font = Enum.Font.GothamBold
 SpeedLabel.TextSize = 12
 
--- أزرار التحكم بالسرعة
 local function CreateSpeedBtn(text, pos, delta)
     local btn = Instance.new("TextButton", SideFrame)
     btn.Size = UDim2.new(0, 40, 0, 40)
@@ -66,7 +62,7 @@ local function CreateSpeedBtn(text, pos, delta)
     btn.TextSize = 20
     
     btn.MouseButton1Click:Connect(function()
-        _G.TravelSpeed = math.max(5, _G.TravelSpeed + delta) -- لا تقل السرعة عن 5
+        _G.TravelSpeed = math.max(5, _G.TravelSpeed + delta)
         SpeedLabel.Text = "Travel Speed:\n" .. _G.TravelSpeed
     end)
 end
@@ -74,7 +70,7 @@ end
 CreateSpeedBtn("+", UDim2.new(0, 55, 0, 85), 5)
 CreateSpeedBtn("-", UDim2.new(0, 10, 0, 85), -5)
 
--- دالة الحركة السلسة (بدل التيلبورت المباشر)
+-- دالة الحركة السلسة
 local function SmoothMove(targetCFrame)
     local char = game.Players.LocalPlayer.Character
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -84,9 +80,8 @@ local function SmoothMove(targetCFrame)
     local duration = distance / _G.TravelSpeed
     
     local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame + Vector3.new(0, 3, 0)})
+    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame + Vector3.new(0, 5, 0)})
     
-    -- تثبيت اللاعب أثناء الحركة لمنع السقوط (اختياري)
     hrp.Anchored = true
     tween:Play()
     tween.Completed:Connect(function()
@@ -94,14 +89,12 @@ local function SmoothMove(targetCFrame)
     end)
 end
 
--- (باقي أجزاء السكريبت السابقة مع تعديل الـ TP)
-
 Title.Name = "Title"
 Title.Parent = MainFrame
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Crystal Manager V3.5 💎"
+Title.Text = "Crystal Manager V3.6 💎"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 
@@ -172,21 +165,31 @@ task.spawn(function()
     end
 end)
 
+-- دالة التيلبورت المعدلة لاستهداف الأكبر حجماً
 local function TeleportToNext(crystalName)
     local allCrystals = {}
     for _, v in pairs(workspace.Things.Crystals:GetChildren()) do
-        if v.Name == crystalName and v:IsA("BasePart") then table.insert(allCrystals, v) end
+        if v.Name == crystalName and v:IsA("BasePart") then 
+            table.insert(allCrystals, v) 
+        end
     end
+    
     if #allCrystals == 0 then return end
     
+    -- ترتيب الكريستالات بناءً على الحجم (الأكبر أولاً)
+    table.sort(allCrystals, function(a, b)
+        return a.Size.Magnitude > b.Size.Magnitude
+    end)
+    
+    -- تصفير العداد إذا انتهت الكريستالات أو بدأت من جديد
     if not LastUsedIndex[crystalName] or LastUsedIndex[crystalName] >= #allCrystals then
         LastUsedIndex[crystalName] = 1
     else
         LastUsedIndex[crystalName] = LastUsedIndex[crystalName] + 1
     end
     
-    -- استخدام الحركة السلسة بدلاً من النقل المباشر
-    SmoothMove(allCrystals[LastUsedIndex[crystalName]].CFrame)
+    local target = allCrystals[LastUsedIndex[crystalName]]
+    SmoothMove(target.CFrame)
 end
 
 local function CreateCrystalControl(name)
@@ -231,7 +234,7 @@ local function CreateCrystalControl(name)
     local TPNextBtn = Instance.new("TextButton", Frame)
     TPNextBtn.Size = UDim2.new(0.3, 0, 0, 50)
     TPNextBtn.Position = UDim2.new(0.68, 0, 0, 30)
-    TPNextBtn.Text = "Go Next"
+    TPNextBtn.Text = "Go Big/Next"
     TPNextBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
     TPNextBtn.TextColor3 = Color3.fromRGB(255,255,255)
     TPNextBtn.MouseButton1Click:Connect(function() TeleportToNext(name) end)
