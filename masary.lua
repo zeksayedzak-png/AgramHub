@@ -1,4 +1,4 @@
--- Worming Scanner (Visible Buttons Only)
+-- Worming Scanner (Fixed Path & Visible Buttons Only)
 -- GitHub: your-username/roblox-scripts
 
 local player = game.Players.LocalPlayer
@@ -67,14 +67,9 @@ UIListLayout.Padding = UDim.new(0, 5)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Parent = ScrollFrame
 
+-- دالة جلب المسار الكامل المعتمدة رسمياً من روبلوكس
 local function getFullPath(instance)
-    local path = instance.Name
-    local parent = instance.Parent
-    while parent and parent ~= game do
-        path = parent.Name .. "." .. path
-        parent = parent.Parent
-    end
-    return path
+    return "game." .. instance:GetFullName()
 end
 
 local function clearList()
@@ -86,6 +81,8 @@ local function clearList()
 end
 
 local function createItem(button)
+    local fullPath = getFullPath(button)
+
     local ItemFrame = Instance.new("Frame")
     ItemFrame.Size = UDim2.new(1, -10, 0, 50)
     ItemFrame.BackgroundColor3 = Color3.fromRGB(255, 200, 150)
@@ -112,7 +109,7 @@ local function createItem(button)
     PathLabel.Size = UDim2.new(1, -60, 0, 20)
     PathLabel.Position = UDim2.new(0, 5, 0, 24)
     PathLabel.BackgroundTransparency = 1
-    PathLabel.Text = getFullPath(button)
+    PathLabel.Text = fullPath
     PathLabel.TextColor3 = Color3.fromRGB(255, 255, 200)
     PathLabel.TextScaled = true
     PathLabel.Font = Enum.Font.Gotham
@@ -134,9 +131,8 @@ local function createItem(button)
     CopyCorner.Parent = CopyBtn
 
     CopyBtn.MouseButton1Click:Connect(function()
-        local path = getFullPath(button)
         if setclipboard then
-            setclipboard(path)
+            setclipboard(fullPath)
             CopyBtn.Text = "Copied!"
             task.wait(1)
             CopyBtn.Text = "Copy"
