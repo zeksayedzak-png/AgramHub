@@ -1,4 +1,4 @@
--- Worming Scanner
+-- Worming Scanner (Visible Buttons Only)
 -- GitHub: your-username/roblox-scripts
 
 local player = game.Players.LocalPlayer
@@ -138,12 +138,45 @@ local function createItem(button)
         if setclipboard then
             setclipboard(path)
             CopyBtn.Text = "Copied!"
-            wait(1)
+            task.wait(1)
             CopyBtn.Text = "Copy"
         else
             CopyBtn.Text = "No Clip"
         end
     end)
+end
+
+local function isButtonVisible(btn)
+    local screenGui = btn:FindFirstAncestorOfClass("ScreenGui")
+    if not screenGui or not screenGui.Enabled then
+        return false
+    end
+
+    local current = btn
+    while current and current ~= screenGui do
+        if current:IsA("GuiObject") and not current.Visible then
+            return false
+        end
+        current = current.Parent
+    end
+
+    if btn.AbsoluteSize.X <= 0 or btn.AbsoluteSize.Y <= 0 then
+        return false
+    end
+
+    local camera = workspace.CurrentCamera
+    if camera then
+        local pos = btn.AbsolutePosition
+        local size = btn.AbsoluteSize
+        local viewportSize = camera.ViewportSize
+
+        if pos.X + size.X < 0 or pos.X > viewportSize.X or
+           pos.Y + size.Y < 0 or pos.Y > viewportSize.Y then
+            return false
+        end
+    end
+
+    return true
 end
 
 local function scanButtons()
@@ -152,7 +185,7 @@ local function scanButtons()
     for _, gui in pairs(PlayerGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui ~= ScreenGui then
             for _, obj in pairs(gui:GetDescendants()) do
-                if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and isButtonVisible(obj) then
                     table.insert(buttons, obj)
                 end
             end
